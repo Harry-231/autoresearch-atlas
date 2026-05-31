@@ -160,17 +160,70 @@ def validate_api_scaffold() -> list[str]:
         ROOT / "apps" / "api" / "src" / "autoresearch_api" / "main.py",
         ROOT / "apps" / "api" / "src" / "autoresearch_api" / "settings.py",
         ROOT / "apps" / "api" / "src" / "autoresearch_api" / "health.py",
+        ROOT / "apps" / "api" / "src" / "autoresearch_api" / "dependencies.py",
+        ROOT / "apps" / "api" / "src" / "autoresearch_api" / "db" / "artifacts.py",
+        ROOT / "apps" / "api" / "src" / "autoresearch_api" / "db" / "neo4j.py",
+        ROOT / "apps" / "api" / "src" / "autoresearch_api" / "db" / "postgres.py",
+        ROOT / "apps" / "api" / "src" / "autoresearch_api" / "db" / "redis.py",
+        ROOT / "apps" / "api" / "src" / "autoresearch_api" / "db" / "repositories.py",
+        ROOT / "apps" / "api" / "src" / "autoresearch_api" / "db" / "resources.py",
     ]
     for path in required_paths:
         if not path.exists():
             failures.append(f"missing API scaffold file: {path.relative_to(ROOT)}")
 
-    health = ROOT / "apps" / "api" / "src" / "autoresearch_api" / "health.py"
-    if health.exists():
-        text = read(health)
-        for token in ["asyncpg", "AsyncGraphDatabase", "Redis.from_url", "boto3.client"]:
+    expected_tokens = {
+        ROOT / "apps" / "api" / "src" / "autoresearch_api" / "main.py": [
+            "lifespan",
+            "AppResources.create",
+            "resources.close",
+        ],
+        ROOT / "apps" / "api" / "src" / "autoresearch_api" / "health.py": [
+            "get_resources",
+            "resources.postgres",
+            "resources.neo4j",
+            "resources.redis",
+            "resources.artifacts",
+        ],
+        ROOT / "apps" / "api" / "src" / "autoresearch_api" / "db" / "postgres.py": [
+            "asyncpg.create_pool",
+            "min_size=settings.postgres_pool_min_size",
+            "max_size=settings.postgres_pool_max_size",
+        ],
+        ROOT / "apps" / "api" / "src" / "autoresearch_api" / "db" / "neo4j.py": [
+            "AsyncGraphDatabase.driver",
+            "verify_connectivity",
+            "RoutingControl",
+        ],
+        ROOT / "apps" / "api" / "src" / "autoresearch_api" / "db" / "redis.py": [
+            "Redis.from_url",
+            "xadd",
+            "publish",
+        ],
+        ROOT / "apps" / "api" / "src" / "autoresearch_api" / "db" / "artifacts.py": [
+            "boto3.client",
+            "head_bucket",
+            "put_object",
+        ],
+        ROOT / "apps" / "api" / "src" / "autoresearch_api" / "db" / "repositories.py": [
+            "ProgramRepository",
+            "HypothesisRepository",
+            "RunRepository",
+            "ClaimRepository",
+            "ApprovalRepository",
+            "BudgetRepository",
+            "EventRepository",
+            "on conflict on constraint hypotheses_idempotency_key",
+        ],
+    }
+
+    for path, tokens in expected_tokens.items():
+        if not path.exists():
+            continue
+        text = read(path)
+        for token in tokens:
             if token not in text:
-                failures.append(f"health probe missing {token}")
+                failures.append(f"{path.relative_to(ROOT)} missing {token}")
 
     return failures
 

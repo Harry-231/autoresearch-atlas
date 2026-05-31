@@ -8,7 +8,8 @@
     "format": "prettier --write \"**/*.{ts,tsx,md}\"",
     "check-types": "turbo run check-types",
     "api:dev": "uv run --project apps/api uvicorn autoresearch_api.main:app --app-dir apps/api/src --reload --host 0.0.0.0 --port 8000",
-    "api:check": "uv run --project apps/api python -m compileall apps/api/src",
+    "api:check": "uv run --project apps/api python -m compileall apps/api/src apps/api/tests",
+    "api:test": "uv run --project apps/api pytest apps/api/tests",
     "db:supabase:start": "npx supabase start",
     "infra:up": "docker compose up -d neo4j redis minio minio-init",
     "db:validate": "python tools/validate_database_foundation.py"

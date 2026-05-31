@@ -1,4 +1,5 @@
 from functools import lru_cache
+from typing import Annotated
 
 from pydantic import AnyUrl, Field, PositiveFloat
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -19,6 +20,9 @@ class Settings(BaseSettings):
     database_url: str = "postgresql://postgres:postgres@127.0.0.1:54322/postgres"
     postgres_schema: str = "crucible"
     langgraph_checkpoint_schema: str = "lg_checkpoints"
+    postgres_pool_min_size: Annotated[int, Field(ge=0)] = 0
+    postgres_pool_max_size: Annotated[int, Field(ge=1)] = 10
+    postgres_command_timeout_seconds: PositiveFloat = 30.0
 
     neo4j_uri: str = "bolt://127.0.0.1:7687"
     neo4j_user: str = "neo4j"
