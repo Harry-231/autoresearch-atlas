@@ -1,0 +1,71 @@
+services:
+  neo4j:
+    image: neo4j:5-community
+    container_name: autoresearch-neo4j
+    restart: unless-stopped
+    ports:
+      - "7474:7474"
+      - "7687:7687"
+    environment:
+      NEO4J_AUTH: neo4j/autoresearch
+      NEO4J_server_memory_heap_initial__size: 512m
+      NEO4J_server_memory_heap_max__size: 1G
+    volumes:
+      - neo4j_data:/data
+      - neo4j_logs:/logs
+    healthcheck:
+      test: ["CMD-SHELL", "cypher-shell -u neo4j -p autoresearch 'RETURN 1'"]
+      interval: 10s
+      timeout: 10s
+      retries: 12
+
+  redis:
+    image: redis:7-alpine
+    container_name: autoresearch-redis
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  minio:
+    image: minio/minio:latest
+    container_name: autoresearch-minio
+    restart: unless-stopped
+    command: ["server", "/data", "--console-address", ":9001"]
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    volumes:
+      - minio_data:/data
+
+  minio-init:
+    image: minio/mc:latest
+    container_name: autoresearch-minio-init
+    depends_on:
+      minio:
+        condition: service_started
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        until mc alias set local http://minio:9000 minioadmin minioadmin; do
+          sleep 2
+        done
+        mc mb --ignore-existing local/crucible-artifacts
+        mc anonymous set none local/crucible-artifacts
+
+volumes:
+  neo4j_data:
+  neo4j_logs:
+  redis_data:
+  minio_data:

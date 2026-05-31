@@ -1,159 +1,134 @@
-# Turborepo starter
+# Autoresearch Atlas
 
-This Turborepo starter is maintained by the Turborepo core team.
+Autoresearch Atlas is the monorepo foundation for Crucible v2: a research
+operating system with a durable hypothesis DAG, graph-native domain memory,
+live trace streams, and immutable experiment artifacts.
 
-## Using this example
+The current repo keeps the Turborepo/Next.js starter apps in place while adding
+the database and API foundation described by the Crucible v2 SRS and ADR.
 
-Run the following command:
+## Architecture
 
-```sh
-npx create-turbo@latest
+The accepted database strategy is polyglot persistence with strict ownership
+boundaries:
+
+- Supabase-managed Postgres 16 + pgvector is the durable system of record in
+  schema `crucible`.
+- LangGraph checkpoints live in separate schema `lg_checkpoints`; this is
+  disposable runtime recovery state, not research truth.
+- Neo4j 5 Community Edition stores the domain graph for papers, methods,
+  entities, claims, contradictions, and hypothesis seeds.
+- Redis carries live run events before they are flushed to `crucible.events`.
+- MinIO/S3 stores immutable blobs such as patch diffs, checkpoints, logs, and
+  replay event logs.
+- FastAPI in `apps/api` is the first server-side connection surface. Do not
+  connect the Next.js frontend directly to the databases.
+
+## Repository Layout
+
+```text
+apps/
+  api/          uv-managed FastAPI control-plane foundation
+  docs/         Next.js docs app from the starter
+  web/          Next.js web app from the starter
+packages/       shared TypeScript configs, eslint config, and UI stubs
+schema/neo4j/   Neo4j Community-compatible constraints and indexes
+supabase/       Supabase config, declarative SQL schemas, and migrations
+tools/          offline validation scripts
 ```
 
-## What's inside?
+## Local Setup
 
-This Turborepo includes the following packages/apps:
+Requirements:
 
-### Apps and Packages
+- Node.js 20 or newer
+- pnpm 9
+- uv
+- Docker Desktop or another Docker-compatible runtime
 
-- `docs`: a [Next.js](https://nextjs.org/) app
-- `web`: another [Next.js](https://nextjs.org/) app
-- `@repo/ui`: a stub React component library shared by both `web` and `docs` applications
-- `@repo/eslint-config`: `eslint` configurations (includes `eslint-config-next` and `eslint-config-prettier`)
-- `@repo/typescript-config`: `tsconfig.json`s used throughout the monorepo
-
-Each package/app is 100% [TypeScript](https://www.typescriptlang.org/).
-
-### Utilities
-
-This Turborepo has some additional tools already setup for you:
-
-- [TypeScript](https://www.typescriptlang.org/) for static type checking
-- [ESLint](https://eslint.org/) for code linting
-- [Prettier](https://prettier.io) for code formatting
-
-### Build
-
-To build all apps and packages, run the following command:
-
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed (recommended):
+Copy environment defaults:
 
 ```sh
-cd my-turborepo
-turbo build
+cp .env.example .env
 ```
 
-Without global `turbo`, use your package manager:
+Start Supabase local Postgres:
 
 ```sh
-cd my-turborepo
-npx turbo build
-pnpm dlx turbo build
-pnpm exec turbo build
+pnpm db:supabase:start
 ```
 
-You can build a specific package by using a [filter](https://turborepo.dev/docs/crafting-your-repository/running-tasks#using-filters):
-
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed:
+Apply migrations if they are not already applied by your local reset/start
+flow:
 
 ```sh
-turbo build --filter=docs
+npx supabase migration up
 ```
 
-Without global `turbo`:
+Start Neo4j, Redis, and MinIO:
 
 ```sh
-npx turbo build --filter=docs
-pnpm exec turbo build --filter=docs
-pnpm exec turbo build --filter=docs
+pnpm infra:up
 ```
 
-### Develop
-
-To develop all apps and packages, run the following command:
-
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed (recommended):
+Run the API:
 
 ```sh
-cd my-turborepo
-turbo dev
+pnpm api:dev
 ```
 
-Without global `turbo`, use your package manager:
+Check the service:
 
 ```sh
-cd my-turborepo
-npx turbo dev
-pnpm exec turbo dev
-pnpm exec turbo dev
+curl http://127.0.0.1:8000/health
+curl http://127.0.0.1:8000/health/dependencies
 ```
 
-You can develop a specific package by using a [filter](https://turborepo.dev/docs/crafting-your-repository/running-tasks#using-filters):
+## Hosted Setup
 
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed:
+Use `.env.hosting.example` as the production template. The app server needs a
+direct Supabase Postgres `DATABASE_URL`; this must never be exposed through
+`NEXT_PUBLIC_*` variables or shipped to browser code.
+
+Recommended hosted mapping:
+
+- Supabase hosted Postgres for `crucible` and `lg_checkpoints`
+- Managed Neo4j or self-hosted Neo4j Community where HA is not required
+- Managed Redis for live streams
+- S3-compatible storage for immutable artifacts
+
+Deploy database changes with the Supabase CLI after linking a project:
 
 ```sh
-turbo dev --filter=web
+npx supabase link
+npx supabase db push
 ```
 
-Without global `turbo`:
+## Database Validation
+
+Run offline structural checks:
 
 ```sh
-npx turbo dev --filter=web
-pnpm exec turbo dev --filter=web
-pnpm exec turbo dev --filter=web
+pnpm db:validate
 ```
 
-### Remote Caching
-
-> [!TIP]
-> Vercel Remote Cache is free for all plans. Get started today at [vercel.com](https://vercel.com/signup?utm_source=remote-cache-sdk&utm_campaign=free_remote_cache).
-
-Turborepo can use a technique known as [Remote Caching](https://turborepo.dev/docs/core-concepts/remote-caching) to share cache artifacts across machines, enabling you to share build caches with your team and CI/CD pipelines.
-
-By default, Turborepo will cache locally. To enable Remote Caching you will need an account with Vercel. If you don't have an account you can [create one](https://vercel.com/signup?utm_source=turborepo-examples), then enter the following commands:
-
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed (recommended):
+Run the API compile check:
 
 ```sh
-cd my-turborepo
-turbo login
+pnpm api:check
 ```
 
-Without global `turbo`, use your package manager:
+The validation script checks for:
 
-```sh
-cd my-turborepo
-npx turbo login
-pnpm exec turbo login
-pnpm exec turbo login
-```
+- required Postgres schemas, extensions, tables, trigger, RLS, and private
+  grants
+- Community-compatible Neo4j constraints and indexes
+- complete local and hosting env templates
+- FastAPI health probe coverage for Postgres, Neo4j, Redis, and S3
 
-This will authenticate the Turborepo CLI with your [Vercel account](https://vercel.com/docs/concepts/personal-accounts/overview).
+## Notes For Windows
 
-Next, you can link your Turborepo to your Remote Cache by running the following command from the root of your Turborepo:
-
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed:
-
-```sh
-turbo link
-```
-
-Without global `turbo`:
-
-```sh
-npx turbo link
-pnpm exec turbo link
-pnpm exec turbo link
-```
-
-## Useful Links
-
-Learn more about the power of Turborepo:
-
-- [Tasks](https://turborepo.dev/docs/crafting-your-repository/running-tasks)
-- [Caching](https://turborepo.dev/docs/crafting-your-repository/caching)
-- [Remote Caching](https://turborepo.dev/docs/core-concepts/remote-caching)
-- [Filtering](https://turborepo.dev/docs/crafting-your-repository/running-tasks#using-filters)
-- [Configuration Options](https://turborepo.dev/docs/reference/configuration)
-- [CLI Usage](https://turborepo.dev/docs/reference/command-line-reference)
+If PowerShell blocks `pnpm.ps1`, call `pnpm.cmd` directly or run from a shell
+where the pnpm command shim is allowed. This repo does not require changing the
+frontend apps to use database clients directly; database access belongs in
+`apps/api`.
