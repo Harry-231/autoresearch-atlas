@@ -40,5 +40,6 @@ Conventions:
   ref. This keeps replay deterministic.
 - Key prefixes are program-scoped so a program's artifacts can be listed,
   archived, or deleted as a unit.
-- Access via the S3 API (`S3_ENDPOINT`, `S3_ACCESS_KEY`, `S3_SECRET_KEY` in
-  `.env`); the bucket is created on first `make up` by the `minio-init` service.
+- Access via the S3 API (`S3_ENDPOINT_URL`, `S3_ACCESS_KEY_ID`,
+  `S3_SECRET_ACCESS_KEY` in `.env`); the bucket is created by the
+  `minio-init` service when `pnpm infra:up` runs.

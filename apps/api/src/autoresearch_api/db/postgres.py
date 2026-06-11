@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import AsyncIterator, Sequence
+from contextlib import asynccontextmanager
 from typing import Protocol
 
 import asyncpg
@@ -41,3 +42,15 @@ class PostgresDatabase:
 
     async def execute(self, query: str, *args: object) -> str:
         return await self._pool.execute(query, *args)
+
+    @asynccontextmanager
+    async def transaction(self) -> AsyncIterator[PostgresExecutor]:
+        """Yield a connection-bound executor wrapped in a single transaction.
+
+        Use for multi-write flows that must be atomic (e.g. creating a program
+        together with its budget and root hypothesis). The yielded object
+        satisfies ``PostgresExecutor`` so repositories bind to it unchanged.
+        """
+        async with self._pool.acquire() as connection:
+            async with connection.transaction():
+                yield connection

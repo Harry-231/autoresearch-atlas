@@ -19,6 +19,7 @@ DEFAULT_CLAIM_CONFIDENCE = Decimal("0.5")
 class ProgramRecord:
     id: UUID
     name: str
+    type: str
     version: str
     spec_yaml: str
     neo4j_graph_id: str | None
@@ -75,6 +76,18 @@ class ClaimRecord:
 
 
 @dataclass(frozen=True)
+class ClaimStagingRecord:
+    id: UUID
+    hypothesis_id: UUID
+    run_id: UUID | None
+    statement: str
+    source_artifact_ref: str | None
+    proposed_confidence: Decimal
+    status: str
+    created_at: datetime
+
+
+@dataclass(frozen=True)
 class ApprovalRecord:
     id: UUID
     run_id: UUID
@@ -116,17 +129,19 @@ class ProgramRepository:
         *,
         name: str,
         spec_yaml: str,
+        type: str = "literature_synthesis",
         version: str = "v1",
         neo4j_graph_id: str | None = None,
         owner: str | None = None,
     ) -> ProgramRecord:
         row = await self._db.fetchrow(
             """
-            insert into crucible.programs (name, version, spec_yaml, neo4j_graph_id, owner)
-            values ($1, $2, $3, $4, $5)
+            insert into crucible.programs (name, type, version, spec_yaml, neo4j_graph_id, owner)
+            values ($1, $2, $3, $4, $5, $6)
             returning *
             """,
             name,
+            type,
             version,
             spec_yaml,
             neo4j_graph_id,
@@ -146,6 +161,18 @@ class ProgramRepository:
         if row is None:
             raise DataNotFoundError(f"Program {program_id} was not found.")
         return _program(row)
+
+    async def list_recent(self, *, limit: int = 100) -> list[ProgramRecord]:
+        rows = await self._db.fetch(
+            """
+            select *
+            from crucible.programs
+            order by created_at desc
+            limit $1
+            """,
+            limit,
+        )
+        return [_program(row) for row in rows]
 
 
 class HypothesisRepository:
@@ -235,6 +262,64 @@ class HypothesisRepository:
             descendant_id,
         )
         return None if row is None else int(row["depth"])
+
+    async def list_for_program(
+        self,
+        program_id: UUID,
+        *,
+        limit: int,
+        after_created_at: datetime | None = None,
+        after_id: UUID | None = None,
+    ) -> list[HypothesisRecord]:
+        """Page a program's DAG nodes by a stable (created_at, id) keyset.
+
+        Uses the ``(program_id, parent_id, status, depth)`` covering index; never a
+        recursive CTE.
+        """
+        rows = await self._db.fetch(
+            """
+            select *
+            from crucible.hypotheses
+            where program_id = $1
+              and ($2::timestamptz is null or (created_at, id) > ($2, $3))
+            order by created_at, id
+            limit $4
+            """,
+            program_id,
+            after_created_at,
+            after_id,
+            limit,
+        )
+        return [_hypothesis(row) for row in rows]
+
+    async def list_subtree(
+        self,
+        program_id: UUID,
+        root_id: UUID,
+        *,
+        limit: int,
+        after_created_at: datetime | None = None,
+        after_id: UUID | None = None,
+    ) -> list[HypothesisRecord]:
+        """Page the descendants of ``root_id`` via the closure table (O(depth), no CTE)."""
+        rows = await self._db.fetch(
+            """
+            select h.*
+            from crucible.hypotheses h
+            join crucible.hypothesis_closure c on c.descendant_id = h.id
+            where c.ancestor_id = $1
+              and h.program_id = $2
+              and ($3::timestamptz is null or (h.created_at, h.id) > ($3, $4))
+            order by h.created_at, h.id
+            limit $5
+            """,
+            root_id,
+            program_id,
+            after_created_at,
+            after_id,
+            limit,
+        )
+        return [_hypothesis(row) for row in rows]
 
 
 class RunRepository:
@@ -338,6 +423,104 @@ class ClaimRepository:
         if row is None:
             raise DataNotFoundError(f"Claim {claim_id} was not found.")
         return _claim(row)
+
+    async def list_for_hypothesis(self, hypothesis_id: UUID, *, limit: int = 20) -> list[ClaimRecord]:
+        rows = await self._db.fetch(
+            """
+            select id,
+                   hypothesis_id,
+                   run_id,
+                   statement,
+                   source_artifact_ref,
+                   confidence,
+                   neo4j_claim_id,
+                   created_at
+            from crucible.claims
+            where hypothesis_id = $1
+            order by created_at desc
+            limit $2
+            """,
+            hypothesis_id,
+            limit,
+        )
+        return [_claim(row) for row in rows]
+
+    async def search_lexical(self, text: str, *, limit: int) -> list[ClaimRecord]:
+        """Case-insensitive substring search over claim statements (parameterized).
+
+        Placeholder ranking until Sprint 6 adds pgvector semantic recall. The value
+        is bound as a parameter; no untrusted text is interpolated into SQL.
+        """
+        rows = await self._db.fetch(
+            """
+            select id,
+                   hypothesis_id,
+                   run_id,
+                   statement,
+                   source_artifact_ref,
+                   confidence,
+                   neo4j_claim_id,
+                   created_at
+            from crucible.claims
+            where statement ilike '%' || $1 || '%'
+            order by created_at desc
+            limit $2
+            """,
+            text,
+            limit,
+        )
+        return [_claim(row) for row in rows]
+
+
+class ClaimStagingRepository:
+    def __init__(self, db: PostgresExecutor):
+        self._db = db
+
+    async def stage(
+        self,
+        *,
+        hypothesis_id: UUID,
+        statement: str,
+        run_id: UUID | None = None,
+        source_artifact_ref: str | None = None,
+        proposed_confidence: Decimal = DEFAULT_CLAIM_CONFIDENCE,
+    ) -> ClaimStagingRecord:
+        """Write a proposed claim to the staging area — never to durable truth."""
+        row = await self._db.fetchrow(
+            """
+            insert into crucible.claim_staging (
+              hypothesis_id,
+              run_id,
+              statement,
+              source_artifact_ref,
+              proposed_confidence
+            )
+            values ($1, $2, $3, $4, $5)
+            returning *
+            """,
+            hypothesis_id,
+            run_id,
+            statement,
+            source_artifact_ref,
+            proposed_confidence,
+        )
+        return _claim_staging(row)
+
+    async def list_for_hypothesis(
+        self, hypothesis_id: UUID, *, limit: int = 50
+    ) -> list[ClaimStagingRecord]:
+        rows = await self._db.fetch(
+            """
+            select *
+            from crucible.claim_staging
+            where hypothesis_id = $1
+            order by created_at desc
+            limit $2
+            """,
+            hypothesis_id,
+            limit,
+        )
+        return [_claim_staging(row) for row in rows]
 
 
 class ApprovalRepository:
@@ -460,6 +643,7 @@ class Repositories:
     hypotheses: HypothesisRepository
     runs: RunRepository
     claims: ClaimRepository
+    claim_staging: ClaimStagingRepository
     approvals: ApprovalRepository
     budgets: BudgetRepository
     events: EventRepository
@@ -471,6 +655,7 @@ class Repositories:
             hypotheses=HypothesisRepository(db),
             runs=RunRepository(db),
             claims=ClaimRepository(db),
+            claim_staging=ClaimStagingRepository(db),
             approvals=ApprovalRepository(db),
             budgets=BudgetRepository(db),
             events=EventRepository(db),
@@ -482,6 +667,7 @@ def _program(row: asyncpg.Record | dict[str, Any] | None) -> ProgramRecord:
     return ProgramRecord(
         id=row["id"],
         name=row["name"],
+        type=row["type"],
         version=row["version"],
         spec_yaml=row["spec_yaml"],
         neo4j_graph_id=row["neo4j_graph_id"],
@@ -540,6 +726,20 @@ def _claim(row: asyncpg.Record | dict[str, Any] | None) -> ClaimRecord:
         source_artifact_ref=row["source_artifact_ref"],
         confidence=row["confidence"],
         neo4j_claim_id=row["neo4j_claim_id"],
+        created_at=row["created_at"],
+    )
+
+
+def _claim_staging(row: asyncpg.Record | dict[str, Any] | None) -> ClaimStagingRecord:
+    _require_row(row, "claim_staging")
+    return ClaimStagingRecord(
+        id=row["id"],
+        hypothesis_id=row["hypothesis_id"],
+        run_id=row["run_id"],
+        statement=row["statement"],
+        source_artifact_ref=row["source_artifact_ref"],
+        proposed_confidence=row["proposed_confidence"],
+        status=row["status"],
         created_at=row["created_at"],
     )
 

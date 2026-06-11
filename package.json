@@ -10,9 +10,16 @@
     "api:dev": "uv run --project apps/api uvicorn autoresearch_api.main:app --app-dir apps/api/src --reload --host 0.0.0.0 --port 8000",
     "api:check": "uv run --project apps/api python -m compileall apps/api/src apps/api/tests",
     "api:test": "uv run --project apps/api pytest apps/api/tests",
-    "db:supabase:start": "npx supabase start",
+    "api:test:live": "uv run --project apps/api pytest apps/api/tests/test_live_repositories.py apps/api/tests/test_live_programs_api.py",
+    "crucible": "uv run --project apps/api crucible",
+    "db:supabase:start": "supabase start",
+    "db:supabase:migrate": "supabase migration up",
+    "db:apply": "uv run --project apps/api python tools/apply_migration.py",
+    "db:up": "docker compose up -d postgres neo4j redis minio minio-init",
+    "db:down": "docker compose down",
     "infra:up": "docker compose up -d neo4j redis minio minio-init",
-    "db:validate": "python tools/validate_database_foundation.py"
+    "db:validate": "python tools/validate_database_foundation.py",
+    "mcp:dev": "uv run --project apps/api crucible-mcp"
   },
   "devDependencies": {
     "prettier": "^3.7.4",

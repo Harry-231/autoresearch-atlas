@@ -1,0 +1,26 @@
+# Crucible research program — literature synthesis (deep research + RAG).
+# Primary Phase-1 example: no GPU, broadest audience.
+name: transformer-efficiency-survey
+type: literature_synthesis
+goal: >-
+  Synthesize the strongest evidence on efficiency techniques for transformer
+  inference (quantization, distillation, sparsity) and surface contradictions
+  between reported results.
+version: v1
+owner: crucible-demo
+metrics:
+  - claim_support_rate
+  - contradiction_coverage
+  - citation_precision
+budget_usd: 15.00
+beam:
+  min: 2
+  max: 4
+backend: local
+sources:
+  - https://arxiv.org/abs/2210.17323
+  - https://arxiv.org/abs/2208.07339
+  - https://arxiv.org/abs/2306.11695
+root_hypothesis: >-
+  Post-training 4-bit quantization preserves task accuracy within 1% for models
+  above 6B parameters.

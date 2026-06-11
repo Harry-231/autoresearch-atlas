@@ -38,6 +38,7 @@ def main() -> int:
     failures: list[str] = []
     failures.extend(validate_supabase_sql())
     failures.extend(validate_neo4j())
+    failures.extend(validate_local_infra())
     failures.extend(validate_env_examples())
     failures.extend(validate_api_scaffold())
 
@@ -108,6 +109,8 @@ def validate_supabase_sql() -> list[str]:
             rel = f"./schemas/{schema_file.name}"
             if rel not in config_text:
                 failures.append(f"supabase/config.toml missing schema path {rel}")
+        if "major_version = 15" not in config_text:
+            failures.append("supabase/config.toml must use db.major_version = 15 for current CLI")
 
     return failures
 
@@ -135,6 +138,41 @@ def validate_neo4j() -> list[str]:
     for name in ["paper_doi", "method_name", "entity_name", "claim_program", "claim_fulltext"]:
         if name not in text:
             failures.append(f"Neo4j indexes missing {name}")
+
+    return failures
+
+
+def validate_local_infra() -> list[str]:
+    failures: list[str] = []
+    compose = ROOT / "docker-compose.yml"
+    package_json = ROOT / "package.json"
+
+    if not compose.exists():
+        failures.append("missing docker-compose.yml")
+    else:
+        text = read(compose)
+        for token in [
+            "neo4j:5-community",
+            "redis:7-alpine",
+            "minio/minio",
+            "minio/mc",
+            "crucible-artifacts",
+            "7474:7474",
+            "7687:7687",
+            "6379:6379",
+            "9000:9000",
+            "9001:9001",
+        ]:
+            if token not in text:
+                failures.append(f"docker-compose.yml missing {token}")
+
+    if not package_json.exists():
+        failures.append("missing package.json")
+    else:
+        text = read(package_json)
+        for token in ['"api:dev"', '"api:check"', '"db:supabase:start"', '"infra:up"', '"db:validate"']:
+            if token not in text:
+                failures.append(f"package.json missing script {token}")
 
     return failures
 

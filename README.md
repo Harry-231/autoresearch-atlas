@@ -12,8 +12,10 @@ the database and API foundation described by the Crucible v2 SRS and ADR.
 The accepted database strategy is polyglot persistence with strict ownership
 boundaries:
 
-- Supabase-managed Postgres 16 + pgvector is the durable system of record in
-  schema `crucible`.
+- Supabase-managed Postgres + pgvector is the durable system of record in
+  schema `crucible`. The local Supabase CLI config currently uses PostgreSQL 15
+  because current CLI validation rejects `db.major_version = 16`; the schema
+  relies on PostgreSQL 15+ features.
 - LangGraph checkpoints live in separate schema `lg_checkpoints`; this is
   disposable runtime recovery state, not research truth.
 - Neo4j 5 Community Edition stores the domain graph for papers, methods,

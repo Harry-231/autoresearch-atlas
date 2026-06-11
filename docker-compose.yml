@@ -1,4 +1,29 @@
 services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: autoresearch-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: postgres
+    ports:
+      # 54322 matches the default DATABASE_URL so the app + tests need no changes.
+      - "54322:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      # Init runs once on an empty data dir, in filename order. Roles first
+      # (02_security.sql revokes from anon/authenticated), then the declarative schema.
+      - ./docker/postgres-init/00_roles.sql:/docker-entrypoint-initdb.d/00_roles.sql:ro
+      - ./supabase/schemas/00_extensions.sql:/docker-entrypoint-initdb.d/01_extensions.sql:ro
+      - ./supabase/schemas/01_crucible.sql:/docker-entrypoint-initdb.d/02_crucible.sql:ro
+      - ./supabase/schemas/02_security.sql:/docker-entrypoint-initdb.d/03_security.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
   neo4j:
     image: neo4j:5-community
     container_name: autoresearch-neo4j
@@ -65,6 +90,7 @@ services:
         mc anonymous set none local/crucible-artifacts
 
 volumes:
+  postgres_data:
   neo4j_data:
   neo4j_logs:
   redis_data:

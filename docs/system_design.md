@@ -261,13 +261,14 @@ Implemented in this repo:
 - Neo4j Community constraints and indexes.
 - Docker Compose services for Neo4j, Redis, MinIO, and bucket init.
 - FastAPI health and dependency probes.
+- FastAPI resource providers and typed data-access repositories for the core
+  Postgres tables plus Neo4j, Redis, and S3 wrappers.
 - Local and hosting env examples.
 - Offline database foundation validator.
 
 Not implemented yet:
 
 - Product API endpoints beyond health.
-- Typed repository layer for Postgres, Neo4j, Redis, and S3.
 - MCP tool server.
 - LangGraph research-loop package.
 - Context Broker ingestion and embeddings.

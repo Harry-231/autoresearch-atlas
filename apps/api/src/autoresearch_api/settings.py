@@ -4,6 +4,11 @@ from typing import Annotated
 from pydantic import AnyUrl, Field, PositiveFloat
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+DEFAULT_CORS_ALLOW_ORIGINS = (
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+)
+
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
@@ -36,6 +41,8 @@ class Settings(BaseSettings):
     s3_bucket: str = "crucible-artifacts"
     s3_region: str = "us-east-1"
     s3_force_path_style: bool = True
+
+    cors_allow_origins: list[str] = list(DEFAULT_CORS_ALLOW_ORIGINS)
 
 
 @lru_cache(maxsize=1)

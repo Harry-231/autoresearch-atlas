@@ -48,6 +48,7 @@ async def test_program_create_uses_parameterized_insert() -> None:
         row={
             "id": program_id,
             "name": "nanochat",
+            "type": "literature_synthesis",
             "version": "v1",
             "spec_yaml": "goal: improve evals",
             "neo4j_graph_id": None,
@@ -65,11 +66,12 @@ async def test_program_create_uses_parameterized_insert() -> None:
 
     assert program.id == program_id
     assert program.name == "nanochat"
+    assert program.type == "literature_synthesis"
     _, query, args = db.calls[0]
     assert "insert into crucible.programs" in query
-    assert "values ($1, $2, $3, $4, $5)" in query
+    assert "values ($1, $2, $3, $4, $5, $6)" in query
     assert "nanochat" not in query
-    assert args == ("nanochat", "v1", "goal: improve evals", None, "atlas")
+    assert args == ("nanochat", "literature_synthesis", "v1", "goal: improve evals", None, "atlas")
 
 
 @pytest.mark.asyncio

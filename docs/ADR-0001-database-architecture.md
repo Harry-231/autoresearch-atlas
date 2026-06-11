@@ -52,6 +52,12 @@ The DAG is an adjacency list (`parent_id`) plus a **closure table**
 subtree/ancestor queries without recursive-CTE scans. Idempotent writes key on
 `(program_id, parent_id, proposal_hash)` (`UNIQUE NULLS NOT DISTINCT`).
 
+**Implementation note (2026-06-01):** the current Supabase CLI rejects
+`db.major_version = 16` in local `supabase/config.toml`. The local stack is
+therefore configured with PostgreSQL 15, which still supports the schema's
+required `UNIQUE NULLS NOT DISTINCT` feature. Hosted Supabase should use the
+project's actual remote major version when linked.
+
 ## Options Considered
 
 ### Option A: Polyglot — Postgres+pgvector / Neo4j / Redis / MinIO (chosen)

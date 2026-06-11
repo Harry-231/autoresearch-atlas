@@ -3,7 +3,7 @@
 Neo4j 5 **Community Edition**. The relationship-native domain memory: papers,
 methods, entities, claims, contradictions, and hypothesis seeds that the Context
 Broker ingests and the MCP server traverses to build context packs. Source of
-truth: [`docs/database/schema/neo4j/`](../database/schema/neo4j/).
+truth: [`schema/neo4j/`](../schema/neo4j/).
 
 > **Community Edition limits.** Only `UNIQUE` constraints and indexes are
 > declarable. `NODE KEY` and property-**existence** constraints are

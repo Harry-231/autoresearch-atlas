@@ -1,0 +1,23 @@
+# Crucible research program — ML experiment (autoresearch loop).
+# Phase-2 example: exercises the experiment backend (training/eval).
+name: nanochat-eval-improvement
+type: ml_experiment
+goal: >-
+  Improve the nanochat evaluation score by proposing and testing minimal training
+  and architecture patches under a fixed overnight budget.
+version: v1
+owner: crucible-demo
+metrics:
+  - primary_eval_score
+  - tokens_per_dollar
+  - reproducibility
+budget_usd: 20.00
+beam:
+  min: 1
+  max: 3
+backend: local
+sources:
+  - https://github.com/karpathy/nanoGPT
+root_hypothesis: >-
+  A cosine learning-rate schedule with warmup improves the primary eval score
+  over the constant-LR baseline.

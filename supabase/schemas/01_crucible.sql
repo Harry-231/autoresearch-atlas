@@ -22,9 +22,15 @@ create type crucible.approval_status as enum (
   'expired'
 );
 
+create type crucible.program_type as enum (
+  'literature_synthesis',
+  'ml_experiment'
+);
+
 create table crucible.programs (
   id uuid primary key default extensions.gen_random_uuid(),
   name text not null,
+  type crucible.program_type not null default 'literature_synthesis',
   version text not null default 'v1',
   spec_yaml text not null,
   neo4j_graph_id text,
@@ -112,6 +118,22 @@ create table crucible.claims (
   constraint claims_confidence_range check (confidence >= 0 and confidence <= 1)
 );
 
+create table crucible.claim_staging (
+  id uuid primary key default extensions.gen_random_uuid(),
+  hypothesis_id uuid not null references crucible.hypotheses(id) on delete restrict,
+  run_id uuid references crucible.runs(id) on delete set null,
+  statement text not null,
+  source_artifact_ref text,
+  proposed_confidence numeric(5, 4) not null default 0.5000,
+  status text not null default 'staged',
+  created_at timestamptz not null default now(),
+  constraint claim_staging_statement_not_blank check (length(btrim(statement)) > 0),
+  constraint claim_staging_confidence_range check (
+    proposed_confidence >= 0 and proposed_confidence <= 1
+  ),
+  constraint claim_staging_status_valid check (status in ('staged', 'promoted', 'rejected'))
+);
+
 create table crucible.approvals (
   id uuid primary key default extensions.gen_random_uuid(),
   run_id uuid not null references crucible.runs(id) on delete restrict,
@@ -163,6 +185,9 @@ create unique index claims_neo4j_claim_id_key
 create index hypotheses_program_parent_idx
   on crucible.hypotheses (program_id, parent_id);
 
+create index hypotheses_program_parent_status_depth_idx
+  on crucible.hypotheses (program_id, parent_id, status, depth);
+
 create index hypotheses_program_status_created_idx
   on crucible.hypotheses (program_id, status, created_at desc);
 
@@ -180,6 +205,9 @@ create index claims_hypothesis_idx
 
 create index claims_run_idx
   on crucible.claims (run_id);
+
+create index claim_staging_hypothesis_idx
+  on crucible.claim_staging (hypothesis_id);
 
 create index events_run_ts_idx
   on crucible.events (run_id, ts);

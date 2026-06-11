@@ -28,6 +28,7 @@ alter table crucible.hypotheses enable row level security;
 alter table crucible.hypothesis_closure enable row level security;
 alter table crucible.runs enable row level security;
 alter table crucible.claims enable row level security;
+alter table crucible.claim_staging enable row level security;
 alter table crucible.approvals enable row level security;
 alter table crucible.budgets enable row level security;
 alter table crucible.events enable row level security;

@@ -17,11 +17,12 @@ Use this status vocabulary in project tracking:
 - `Not Started` - no committed implementation.
 - `In Progress` - implementation exists but acceptance criteria do not pass.
 - `Blocked` - external dependency or unresolved design decision prevents work.
-- `Done` - acceptance criteria pass locally and in CI.
+- `Done` - acceptance criteria pass locally; once CI exists, they also pass in
+  CI.
 
 ## Sprint 0 - Foundation And Local Runtime
 
-Status: `In Progress`
+Status: `Done`
 
 Goal: Make the repository bootable and prove the selected datastore foundation.
 
@@ -45,6 +46,7 @@ Deliverables:
 - `.env.example`
 - `.env.hosting.example`
 - `tools/validate_database_foundation.py`
+- local ignored execution report at `docs/Sprint_0.md`
 
 Acceptance criteria:
 
@@ -61,9 +63,21 @@ Progress metrics:
 - API dependency probes implemented: 4 of 4.
 - Local service config present: 4 of 4 stores.
 
+Current notes:
+
+- Offline validation, uv lock check, API source lint, monorepo type checks, and
+  FastAPI health endpoint verification pass.
+- Docker Desktop is installed and the local Supabase stack starts with
+  `pnpm db:supabase:start`.
+- Neo4j, Redis, MinIO, and bucket initialization start with `pnpm infra:up`.
+- Live Supabase SQL verifies schemas, extensions, RLS, private grants, and all
+  8 `crucible` tables.
+- Live Neo4j constraints/indexes, Redis stream write/read, S3 object
+  write/read, and `GET /health/dependencies` all pass.
+
 ## Sprint 1 - FastAPI Data Access Layer
 
-Status: `Not Started`
+Status: `Done`
 
 Goal: Add typed server-side access to the system of record without exposing
 database clients to the frontend or agents.
@@ -84,7 +98,11 @@ Deliverables:
 - `apps/api/src/autoresearch_api/db/neo4j.py`
 - `apps/api/src/autoresearch_api/db/redis.py`
 - `apps/api/src/autoresearch_api/db/artifacts.py`
+- `apps/api/src/autoresearch_api/db/resources.py`
+- `apps/api/src/autoresearch_api/dependencies.py`
+- shared-resource health probes
 - focused unit tests for repository behavior where live DB is not required
+- local ignored execution report at `docs/Sprint_1.md`
 
 Acceptance criteria:
 
@@ -97,9 +115,20 @@ Acceptance criteria:
 
 Progress metrics:
 
-- Repository coverage for core tables: 8 of 8.
-- Live DB smoke cases passing: program, root hypothesis, child hypothesis,
-  duplicate proposal.
+- Repository coverage for core tables: 8 of 8 implemented.
+- Offline repository test cases: 6 passing.
+- Live DB smoke cases passing: 4 of 4.
+
+Current notes:
+
+- Offline implementation is complete for repository/provider shape.
+- Live Supabase repository verification passes for program insert/read,
+  root/child closure rows, duplicate proposal idempotency, and shared resource
+  lifecycle/dependency health.
+- `api:test:live` is gated by `AUTORESEARCH_RUN_LIVE_DB_TESTS=1` so normal test
+  runs do not require local Docker services.
+- Sprint report files matching `docs/Sprint_*.md` are ignored so local execution
+  notes do not upload to GitHub.
 
 ## Sprint 2 - Program Import And DAG API
 
@@ -477,5 +506,4 @@ These items should be pulled into the sprint where they become necessary:
 
 ## Current Recommended Next Sprint
 
-Start Sprint 1. The database foundation exists, but the product cannot advance
-until FastAPI has a repository layer and real program/hypothesis data access.
+Start Sprint 2 next: Program Import And DAG API.
