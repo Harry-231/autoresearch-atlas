@@ -21,8 +21,8 @@ apps/*/.venv/
 !.env.hosting.example
 !.env*.example
 
-# Local sprint execution reports
-docs/Sprint_*.md
+# Documentation & resources (kept local, not pushed)
+docs/
 
 # Python
 __pycache__/
