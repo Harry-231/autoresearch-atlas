@@ -8,16 +8,24 @@ apps/*/.venv/
 .pnp
 .pnp.js
 
-# Local env files
+# Local env files (sensitive — never commit real env files; templates are whitelisted)
 .env
+.env.*
+*.env
 .env.local
 .env*.local
 .env.development.local
 .env.test.local
 .env.production.local
+!.env.example
+!.env.hosting.example
+!.env*.example
+
+# Local sprint execution reports
+docs/Sprint_*.md
 
 # Python
-__pycache__
+__pycache__/
 *.py[cod]
 *.pyd
 .pytest_cache/
@@ -29,6 +37,7 @@ htmlcov/
 
 # Testing
 coverage/
+_tmp_*
 
 # Turbo
 .turbo/
@@ -49,6 +58,8 @@ out/
 build/
 dist/
 
+# Generated scratch outputs (presentations, exports, etc.)
+outputs/
 
 # Debug
 *.log
@@ -58,7 +69,15 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 
-# Misc
+# Secrets / credentials
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
+
+# Misc / editor
 .DS_Store
 Thumbs.db
-*.pem
+*.swp
+*~
